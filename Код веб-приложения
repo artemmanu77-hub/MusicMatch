@@ -1,0 +1,1969 @@
+# Запуск:
+#   pip install flask scikit-learn
+#   python app.py
+from flask import Flask, render_template_string, jsonify, request
+from sklearn.ensemble import RandomForestRegressor
+import numpy as np
+from datetime import datetime
+
+app = Flask(__name__)
+
+#ДАННЫЕ О ДИСТРИБЬЮТОРАХ
+# Добавлены честные экспертные оценки по категориям (0–10)
+
+distributors = [
+    {
+        "name": "Zvonko Digital",
+        "year": 2019,
+        "artists": 120,
+        "commission": 15,
+        "payout_days": 45,
+        "tiktok": True,
+        "vk": True,
+        # экспертные оценки
+        "scores": {
+            "payouts": 7,        # надежность и предсказуемость выплат
+            "speed": 7,          # скорость выплат
+            "support": 8,        # качество поддержки
+            "transparency": 7,   # прозрачность отчетов
+            "promo": 6,          # промо-поддержка
+            "ux": 8,             # удобство кабинета
+            "reputation": 7,     # репутация
+            "stability": 7,      # стабильность доставки релизов
+        },
+    },
+    {
+        "name": "Believe Russia",
+        "year": 2016,
+        "artists": 2000,
+        "commission": 20,
+        "payout_days": 60,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 8,
+            "speed": 6,
+            "support": 7,
+            "transparency": 8,
+            "promo": 9,
+            "ux": 7,
+            "reputation": 9,
+            "stability": 8,
+        },
+    },
+    {
+        "name": "DistroKid (RU партнер)",
+        "year": 2018,
+        "artists": 500,
+        "commission": 20,
+        "payout_days": 30,
+        "tiktok": False,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 9,
+            "support": 6,
+            "transparency": 7,
+            "promo": 6,
+            "ux": 8,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "ONErpm RU",
+        "year": 2015,
+        "artists": 800,
+        "commission": 18,
+        "payout_days": 45,
+        "tiktok": True,
+        "vk": False,
+        "scores": {
+            "payouts": 7,
+            "speed": 7,
+            "support": 7,
+            "transparency": 7,
+            "promo": 7,
+            "ux": 7,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "Amuse Russia",
+        "year": 2020,
+        "artists": 150,
+        "commission": 10,
+        "payout_days": 90,
+        "tiktok": False,
+        "vk": False,
+        "scores": {
+            "payouts": 5,
+            "speed": 3,
+            "support": 5,
+            "transparency": 6,
+            "promo": 4,
+            "ux": 7,
+            "reputation": 5,
+            "stability": 5,
+        },
+    },
+    {
+        "name": "CD Baby Russia",
+        "year": 2017,
+        "artists": 320,
+        "commission": 19,
+        "payout_days": 50,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 6,
+            "support": 7,
+            "transparency": 8,
+            "promo": 7,
+            "ux": 7,
+            "reputation": 8,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "Yandex Music Distribution",
+        "year": 2014,
+        "artists": 2500,
+        "commission": 17,
+        "payout_days": 40,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 8,
+            "speed": 8,
+            "support": 7,
+            "transparency": 8,
+            "promo": 8,
+            "ux": 8,
+            "reputation": 9,
+            "stability": 9,
+        },
+    },
+    {
+        "name": "VK Music Partners",
+        "year": 2013,
+        "artists": 1800,
+        "commission": 16,
+        "payout_days": 35,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 8,
+            "speed": 8,
+            "support": 7,
+            "transparency": 7,
+            "promo": 8,
+            "ux": 7,
+            "reputation": 8,
+            "stability": 8,
+        },
+    },
+    {
+        "name": "TuneCore Russia",
+        "year": 2016,
+        "artists": 900,
+        "commission": 18,
+        "payout_days": 55,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 6,
+            "support": 6,
+            "transparency": 7,
+            "promo": 7,
+            "ux": 7,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "United Music RU",
+        "year": 2018,
+        "artists": 400,
+        "commission": 14,
+        "payout_days": 40,
+        "tiktok": True,
+        "vk": False,
+        "scores": {
+            "payouts": 7,
+            "speed": 7,
+            "support": 7,
+            "transparency": 7,
+            "promo": 6,
+            "ux": 7,
+            "reputation": 6,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "IndieFlow Russia",
+        "year": 2021,
+        "artists": 220,
+        "commission": 12,
+        "payout_days": 35,
+        "tiktok": False,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 8,
+            "support": 7,
+            "transparency": 7,
+            "promo": 5,
+            "ux": 8,
+            "reputation": 6,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "SoundBridge RU",
+        "year": 2019,
+        "artists": 300,
+        "commission": 17,
+        "payout_days": 50,
+        "tiktok": True,
+        "vk": False,
+        "scores": {
+            "payouts": 6,
+            "speed": 6,
+            "support": 6,
+            "transparency": 6,
+            "promo": 6,
+            "ux": 7,
+            "reputation": 6,
+            "stability": 6,
+        },
+    },
+    {
+        "name": "BeatWave Russia",
+        "year": 2017,
+        "artists": 650,
+        "commission": 16,
+        "payout_days": 45,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 7,
+            "support": 7,
+            "transparency": 7,
+            "promo": 7,
+            "ux": 7,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "NovaMusic RU",
+        "year": 2020,
+        "artists": 180,
+        "commission": 13,
+        "payout_days": 60,
+        "tiktok": False,
+        "vk": True,
+        "scores": {
+            "payouts": 6,
+            "speed": 5,
+            "support": 6,
+            "transparency": 6,
+            "promo": 5,
+            "ux": 7,
+            "reputation": 6,
+            "stability": 6,
+        },
+    },
+    {
+        "name": "StarTrack Russia",
+        "year": 2015,
+        "artists": 1100,
+        "commission": 19,
+        "payout_days": 65,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 5,
+            "support": 7,
+            "transparency": 7,
+            "promo": 8,
+            "ux": 7,
+            "reputation": 8,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "Orbit Music RU",
+        "year": 2016,
+        "artists": 750,
+        "commission": 18,
+        "payout_days": 50,
+        "tiktok": False,
+        "vk": True,
+        "scores": {
+            "payouts": 6,
+            "speed": 6,
+            "support": 6,
+            "transparency": 6,
+            "promo": 6,
+            "ux": 6,
+            "reputation": 6,
+            "stability": 6,
+        },
+    },
+    {
+        "name": "NextLevel Distribution",
+        "year": 2019,
+        "artists": 260,
+        "commission": 15,
+        "payout_days": 42,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 7,
+            "support": 7,
+            "transparency": 7,
+            "promo": 7,
+            "ux": 7,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "Skyline Music RU",
+        "year": 2018,
+        "artists": 520,
+        "commission": 17,
+        "payout_days": 48,
+        "tiktok": True,
+        "vk": False,
+        "scores": {
+            "payouts": 6,
+            "speed": 6,
+            "support": 6,
+            "transparency": 6,
+            "promo": 6,
+            "ux": 7,
+            "reputation": 6,
+            "stability": 6,
+        },
+    },
+    {
+        "name": "Aurora Sound Russia",
+        "year": 2021,
+        "artists": 140,
+        "commission": 11,
+        "payout_days": 55,
+        "tiktok": False,
+        "vk": False,
+        "scores": {
+            "payouts": 6,
+            "speed": 5,
+            "support": 6,
+            "transparency": 6,
+            "promo": 4,
+            "ux": 7,
+            "reputation": 5,
+            "stability": 5,
+        },
+    },
+    {
+        "name": "MetroBeat RU",
+        "year": 2014,
+        "artists": 1300,
+        "commission": 20,
+        "payout_days": 60,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 6,
+            "support": 7,
+            "transparency": 7,
+            "promo": 8,
+            "ux": 7,
+            "reputation": 8,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "EchoLabel Russia",
+        "year": 2017,
+        "artists": 480,
+        "commission": 16,
+        "payout_days": 45,
+        "tiktok": False,
+        "vk": True,
+        "scores": {
+            "payouts": 7,
+            "speed": 7,
+            "support": 7,
+            "transparency": 7,
+            "promo": 6,
+            "ux": 7,
+            "reputation": 7,
+            "stability": 7,
+        },
+    },
+    {
+        "name": "Pulse Music RU",
+        "year": 2019,
+        "artists": 310,
+        "commission": 14,
+        "payout_days": 38,
+        "tiktok": True,
+        "vk": True,
+        "scores": {
+            "payouts": 8,
+            "speed": 8,
+            "support": 7,
+            "transparency": 7,
+            "promo": 7,
+            "ux": 8,
+            "reputation": 7,
+            "stability": 8,
+        },
+    },
+    {
+        "name": "Waveform Distribution",
+        "year": 2016,
+        "artists": 720,
+        "commission": 18,
+        "payout_days": 52,
+        "tiktok": True,
+        "vk": False,
+        "scores": {
+            "payouts": 6,
+            "speed": 6,
+            "support": 6,
+            "transparency": 6,
+            "promo": 6,
+            "ux": 6,
+            "reputation": 6,
+            "stability": 6,
+        },
+    },
+]
+
+# ЧЕСТНЫЙ РЕЙТИНГ НА ОСНОВЕ ML-МОДЕЛИ
+
+def base_overall_from_scores(scores: dict) -> float:
+    # честный базовый рейтинг как средневзвешенное по категориям
+    # веса: выплаты 20, скорость 15, поддержка 15, прозрачность 10,
+    # промо 10, UX 10, репутация 10, стабильность 10
+    w = {
+        "payouts": 20,
+        "speed": 15,
+        "support": 15,
+        "transparency": 10,
+        "promo": 10,
+        "ux": 10,
+        "reputation": 10,
+        "stability": 10,
+    }
+    total_w = sum(w.values())
+    s = 0.0
+    for k, weight in w.items():
+        s += scores[k] * weight
+    # переводим 0–10 в 0–100
+    return (s / total_w) * 10.0
+
+
+def ml_label(score: int) -> str:
+    if score >= 80:
+        return "Высокая"
+    if score >= 50:
+        return "Средняя"
+    return "Низкая"
+
+
+def explanation_for(d, score: int, scores: dict) -> dict:
+    pluses = []
+    minuses = []
+    recs = []
+    fit = []
+
+    # комиссия
+    if d["commission"] <= 12:
+        pluses.append("Низкая комиссия делает условия привлекательными.")
+    elif d["commission"] > 18:
+        minuses.append("Комиссия выше средней по рынку.")
+
+    # выплаты
+    if scores["payouts"] >= 8:
+        pluses.append("Надёжные и предсказуемые выплаты.")
+    elif scores["payouts"] <= 5:
+        minuses.append("Есть вопросы к надёжности выплат.")
+
+    # скорость
+    if scores["speed"] >= 8:
+        pluses.append("Быстрые выплаты — деньги приходят оперативно.")
+    elif scores["speed"] <= 5:
+        minuses.append("Скорость выплат ниже комфортного уровня.")
+
+    # поддержка
+    if scores["support"] >= 8:
+        pluses.append("Сильная поддержка: быстро реагируют и помогают.")
+    elif scores["support"] <= 5:
+        minuses.append("Поддержка может отвечать медленно или формально.")
+
+    # прозрачность
+    if scores["transparency"] >= 8:
+        pluses.append("Хорошая прозрачность отчётов и понятная аналитика.")
+    elif scores["transparency"] <= 5:
+        minuses.append("Отчёты могут быть не до конца прозрачными.")
+
+    # промо
+    if scores["promo"] >= 8:
+        pluses.append("Сильная промо‑поддержка и возможности продвижения.")
+    elif scores["promo"] <= 5:
+        minuses.append("Промо‑поддержка ограниченная или слабая.")
+
+    # UX
+    if scores["ux"] >= 8:
+        pluses.append("Удобный личный кабинет и понятный интерфейс.")
+    elif scores["ux"] <= 5:
+        minuses.append("Интерфейс может быть неудобным или устаревшим.")
+
+    # репутация
+    if scores["reputation"] >= 8:
+        pluses.append("Хорошая репутация на рынке и доверие артистов.")
+    elif scores["reputation"] <= 5:
+        minuses.append("Репутация неоднозначная, стоит изучить отзывы.")
+
+    # стабильность
+    if scores["stability"] >= 8:
+        pluses.append("Стабильная доставка релизов на площадки.")
+    elif scores["stability"] <= 5:
+        minuses.append("Возможны задержки или нестабильность доставки релизов.")
+
+    # соцсети
+    if d["tiktok"] and d["vk"]:
+        pluses.append("Хорошее покрытие соцсетей за счёт TikTok и VK.")
+    elif not d["tiktok"] and not d["vk"]:
+        minuses.append("Нет интеграций с TikTok и VK — слабая соцсеть‑поддержка.")
+    else:
+        pluses.append("Есть интеграция хотя бы с одной крупной соцсетью.")
+
+    # общая оценка
+    if score >= 80:
+        recs.append("Подходит как основная платформа для релизов и долгосрочного сотрудничества.")
+    elif score >= 60:
+        recs.append("Подходит как рабочий вариант, но стоит сравнить с альтернативами.")
+    else:
+        recs.append("Лучше рассматривать как дополнительный канал или внимательно изучить условия.")
+
+    # кому подходит
+    if d["artists"] < 300:
+        fit.append("Хороший вариант для независимых артистов и небольших лейблов.")
+    elif d["artists"] > 1500:
+        fit.append("Подходит крупным лейблам и артистам с большим каталогом.")
+    else:
+        fit.append("Сбалансированный вариант для артистов среднего уровня и небольших команд.")
+
+    if d["commission"] <= 12:
+        fit.append("Особенно интересен тем, кто чувствителен к размеру комиссии.")
+
+    return {
+        "pluses": pluses[:4],
+        "minuses": minuses[:4],
+        "recommendations": recs,
+        "fit": fit,
+    }
+
+
+# ОБУЧЕНИЕ ML-МОДЕЛИ
+
+# Фичи: экспертные оценки + базовые параметры
+X = []
+y = []
+
+for d in distributors:
+    s = d["scores"]
+    X.append([
+        d["commission"],
+        d["payout_days"],
+        int(d["tiktok"]),
+        int(d["vk"]),
+        d["artists"],
+        d["year"],
+        s["payouts"],
+        s["speed"],
+        s["support"],
+        s["transparency"],
+        s["promo"],
+        s["ux"],
+        s["reputation"],
+        s["stability"],
+    ])
+    y.append(base_overall_from_scores(s))
+
+X = np.array(X, dtype=float)
+y = np.array(y, dtype=float)
+
+model = RandomForestRegressor(n_estimators=200, random_state=42)
+model.fit(X, y)
+
+
+def model_predict_rating(d):
+    s = d["scores"]
+    x = np.array([[
+        d["commission"],
+        d["payout_days"],
+        int(d["tiktok"]),
+        int(d["vk"]),
+        d["artists"],
+        d["year"],
+        s["payouts"],
+        s["speed"],
+        s["support"],
+        s["transparency"],
+        s["promo"],
+        s["ux"],
+        s["reputation"],
+        s["stability"],
+    ]], dtype=float)
+    pred = float(model.predict(x)[0])
+    pred = max(0, min(100, pred))
+    return round(pred)
+
+
+# Предрасчёт рейтингов и текстов
+for d in distributors:
+    score = model_predict_rating(d)
+    d["rating"] = score
+    d["ml_label"] = ml_label(score)
+    expl = explanation_for(d, score, d["scores"])
+    d["pluses"] = expl["pluses"]
+    d["minuses"] = expl["minuses"]
+    d["recommendations"] = expl["recommendations"]
+    d["fit"] = expl["fit"]
+
+
+# HTML
+
+INDEX_HTML = r"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>MusicMatch – Анализ дистрибьюторов</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+
+  <style>
+    :root {
+      --bg: #f9f9fb;
+      --card-bg: #ffffff;
+      --accent-1: #5a9b7e;
+      --accent-2: #5e6b9b;
+      --text-main: #1f2430;
+      --text-muted: #6b7280;
+      --border-soft: #e2e4ea;
+      --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.08);
+      --radius-card: 18px;
+      --radius-btn: 12px;
+      --transition-fast: 0.18s ease-out;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at top left, #eef2ff 0, #f9f9fb 40%, #f9f9fb 100%);
+      color: var(--text-main);
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 18px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 20px;
+      letter-spacing: 0.03em;
+    }
+
+    .logo-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      box-shadow: 0 10px 25px rgba(90, 155, 126, 0.4);
+    }
+
+    .logo-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px);
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: stretch;
+      padding: 10px 16px 24px;
+    }
+
+    .screen {
+      display: none;
+      width: 100%;
+      max-width: 1080px;
+    }
+
+    .screen.active {
+      display: flex;
+      gap: 24px;
+    }
+
+    .screen-main-left,
+    .screen-main-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius-card);
+      box-shadow: var(--shadow-soft);
+      padding: 22px 22px 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+
+    .card:hover {
+      transform: translateY(-2px) scale(1.01);
+      box-shadow: 0 22px 55px rgba(15, 23, 42, 0.12);
+    }
+
+    .card-header-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--accent-2);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .hero-title {
+      font-size: 28px;
+      font-weight: 700;
+      margin: 0 0 6px;
+    }
+
+    .hero-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      max-width: 420px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .btn {
+      border-radius: var(--radius-btn);
+      border: none;
+      padding: 11px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background-color var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast);
+      outline: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-1), #4f8a71);
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(90, 155, 126, 0.45);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(90, 155, 126, 0.55);
+      opacity: 0.96;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--accent-2);
+      border: 1px solid rgba(94, 107, 155, 0.6);
+    }
+
+    .btn-outline:hover {
+      background: rgba(94, 107, 155, 0.06);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    .btn-ghost:hover {
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      align-items: center;
+    }
+
+    .hero-meta span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hero-meta i {
+      color: var(--accent-1);
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .metric-chip {
+      border-radius: 999px;
+      border: 1px solid var(--border-soft);
+      padding: 7px 10px;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .metric-chip i {
+      color: var(--accent-2);
+    }
+
+    .screen-main-right .card {
+      min-height: 220px;
+    }
+
+    .rating-list {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .rating-list-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+      border-bottom: 1px dashed rgba(226, 228, 234, 0.8);
+    }
+
+    .rating-list-row:last-child {
+      border-bottom: none;
+    }
+
+    .rating-badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .rating-badge-high {
+      background: rgba(34, 197, 94, 0.12);
+      color: #15803d;
+    }
+
+    .rating-badge-mid {
+      background: rgba(59, 130, 246, 0.12);
+      color: #1d4ed8;
+    }
+
+    .rating-badge-low {
+      background: rgba(248, 113, 113, 0.12);
+      color: #b91c1c;
+    }
+
+    .screen-analysis {
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .analysis-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .analysis-title {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .analysis-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 14px;
+    }
+
+    .input-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      flex: 1;
+      min-width: 220px;
+    }
+
+    .input-wrapper i {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .text-input {
+      width: 100%;
+      padding: 9px 11px 9px 30px;
+      border-radius: 11px;
+      border: 1px solid var(--border-soft);
+      font-size: 14px;
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+      background: rgba(255, 255, 255, 0.9);
+    }
+
+    .text-input:focus {
+      border-color: rgba(94, 107, 155, 0.9);
+      box-shadow: 0 0 0 1px rgba(94, 107, 155, 0.25);
+      background: #ffffff;
+    }
+
+    .helper-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .loading-banner {
+      display: none;
+      margin-top: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      background: rgba(94, 107, 155, 0.06);
+      font-size: 13px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .loading-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent-2);
+      animation: pulse 0.9s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { transform: scale(0.9); opacity: 0.6; }
+      to { transform: scale(1.2); opacity: 1; }
+    }
+
+    .result-card {
+      margin-top: 14px;
+      display: none;
+      border-radius: var(--radius-card);
+      background: var(--card-bg);
+      box-shadow: var(--shadow-soft);
+      padding: 18px 18px 16px;
+    }
+
+    .result-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .result-name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .result-rating-main {
+      font-size: 22px;
+      font-weight: 700;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .result-rating-main span {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 14px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    .result-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .result-value {
+      font-weight: 500;
+    }
+
+    .result-explanation {
+      font-size: 13px;
+      color: var(--text-main);
+      padding: 10px 11px;
+      border-radius: 12px;
+      background: rgba(90, 155, 126, 0.04);
+      border: 1px dashed rgba(90, 155, 126, 0.4);
+      margin-top: 4px;
+    }
+
+    .result-columns {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    .result-column-block {
+      border-radius: 12px;
+      border: 1px solid rgba(226, 228, 234, 0.9);
+      padding: 8px 9px;
+      background: rgba(249, 250, 251, 0.9);
+    }
+
+    .result-column-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .result-column-block ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+
+    .result-column-block li {
+      margin-bottom: 3px;
+    }
+
+    .category-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    .category-table th,
+    .category-table td {
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(226, 228, 234, 0.8);
+      text-align: left;
+    }
+
+    .category-table th {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .back-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+
+    footer {
+      padding: 10px 20px 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top: 1px solid rgba(226, 228, 234, 0.8);
+      background: rgba(249, 249, 251, 0.9);
+      backdrop-filter: blur(10px);
+    }
+
+    .footer-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .footer-right i {
+      color: var(--accent-2);
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.35);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 40;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border-radius: 18px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35);
+      width: min(720px, 96vw);
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalIn 0.18s ease-out;
+    }
+
+    @keyframes modalIn {
+      from { transform: translateY(10px) scale(0.97); opacity: 0; }
+      to { transform: translateY(0) scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid rgba(226, 228, 234, 0.9);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .modal-subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .modal-close {
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-radius: 999px;
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    }
+
+    .modal-close:hover {
+      background: rgba(148, 163, 184, 0.18);
+      color: var(--text-main);
+      transform: rotate(4deg);
+    }
+
+    .modal-body {
+      padding: 10px 16px 14px;
+      overflow: auto;
+    }
+
+    .rating-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .rating-table th,
+    .rating-table td {
+      padding: 8px 8px;
+      text-align: left;
+      border-bottom: 1px solid rgba(226, 228, 234, 0.8);
+    }
+
+    .rating-table th {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      background: rgba(249, 250, 251, 0.9);
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .rating-table tr:hover td {
+      background: rgba(249, 250, 251, 0.9);
+    }
+
+    .rating-score {
+      font-weight: 600;
+    }
+
+    .badge-label {
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge-high {
+      background: rgba(34, 197, 94, 0.12);
+      color: #15803d;
+    }
+
+    .badge-mid {
+      background: rgba(59, 130, 246, 0.12);
+      color: #1d4ed8;
+    }
+
+    .badge-low {
+      background: rgba(248, 113, 113, 0.12);
+      color: #b91c1c;
+    }
+
+    @media (max-width: 768px) {
+      header {
+        padding: 14px 14px 10px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      main {
+        padding: 8px 10px 18px;
+      }
+
+      .screen.active {
+        flex-direction: column;
+      }
+
+      .card {
+        padding: 18px 16px 16px;
+      }
+
+      .hero-title {
+        font-size: 22px;
+      }
+
+      .hero-subtitle {
+        font-size: 13px;
+      }
+
+      .screen-main-left,
+      .screen-main-right {
+        width: 100%;
+      }
+
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .input-group {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .input-wrapper {
+        width: 100%;
+      }
+
+      .result-columns {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="app-shell">
+  <header>
+    <div>
+      <div class="logo">
+        <div class="logo-icon">
+          <i class="fa-solid fa-music"></i>
+        </div>
+        <div>
+          <div>MusicMatch</div>
+          <div class="logo-sub">Аналитика дистрибьюторов</div>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="pill">
+        <i class="fa-solid fa-brain"></i>
+        ML-анализ российских музыкальных дистрибьюторов
+      </span>
+      <span class="pill">
+        <i class="fa-solid fa-chart-line"></i>
+        Честный рейтинг 0–100
+      </span>
+    </div>
+  </header>
+
+  <main>
+    <!-- ГЛАВНЫЙ ЭКРАН -->
+    <section id="screen-main" class="screen active">
+      <div class="screen-main-left">
+        <div class="card">
+          <div class="card-header-label">Добро пожаловать</div>
+          <h1 class="hero-title">Анализ российских дистрибьюторов с помощью ML‑модели</h1>
+          <p class="hero-subtitle">
+            MusicMatch использует ML‑модель, обученную на экспертных оценках, чтобы честно оценивать российских
+            дистрибьюторов по выплатам, поддержке, прозрачности и другим факторам.
+          </p>
+
+          <div class="hero-actions">
+            <button id="btn-go" class="btn btn-primary">
+              <i class="fa-solid fa-play"></i>
+              GO
+            </button>
+            <button id="btn-rating" class="btn btn-outline">
+              <i class="fa-solid fa-ranking-star"></i>
+              РЕЙТИНГ
+            </button>
+          </div>
+
+          <div class="hero-meta">
+            <span><i class="fa-solid fa-circle-nodes"></i> Учитываем: комиссию, выплаты, поддержку, репутацию</span>
+            <span><i class="fa-solid fa-gauge-high"></i> Итоговый ML‑рейтинг и оценка</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header-label">Как считается рейтинг</div>
+          <div class="metric-grid">
+            <div class="metric-chip">
+              <i class="fa-solid fa-money-bill-transfer"></i>
+              Надёжность и скорость выплат
+            </div>
+            <div class="metric-chip">
+              <i class="fa-solid fa-headset"></i>
+              Качество поддержки
+            </div>
+            <div class="metric-chip">
+              <i class="fa-solid fa-file-lines"></i>
+              Прозрачность отчётов
+            </div>
+            <div class="metric-chip">
+              <i class="fa-solid fa-bullhorn"></i>
+              Промо‑поддержка и продвижение
+            </div>
+            <div class="metric-chip">
+              <i class="fa-solid fa-display"></i>
+              Удобство личного кабинета
+            </div>
+            <div class="metric-chip">
+              <i class="fa-solid fa-star-half-stroke"></i>
+              Репутация и стабильность релизов
+            </div>
+          </div>
+          <p class="helper-text" style="margin-top:10px;">
+            ML‑модель обучена на экспертных оценках по категориям и сама определяет, какие факторы сильнее влияют
+            на итоговый рейтинг.
+          </p>
+        </div>
+      </div>
+
+      <div class="screen-main-right">
+        <div class="card">
+          <div class="card-header-label">Топ дистрибьюторов</div>
+          <p class="helper-text">
+            Краткий список лидеров по ML‑рейтингу. Полный список доступен по кнопке «РЕЙТИНГ».
+          </p>
+          <div id="top-list" class="rating-list"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header-label">Подсказка</div>
+          <p class="helper-text">
+            Нажмите «GO», чтобы перейти к детальному анализу конкретного дистрибьютора. Выберите его из списка
+            или начните вводить название — поле поддерживает автодополнение.
+          </p>
+          <button id="btn-go-secondary" class="btn btn-outline" style="margin-top:8px;">
+            <i class="fa-solid fa-arrow-right"></i>
+            Перейти к анализу
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ЭКРАН АНАЛИЗА -->
+    <section id="screen-analysis" class="screen screen-analysis">
+      <div class="card">
+        <div class="analysis-header">
+          <div>
+            <div class="card-header-label">Шаг 1</div>
+            <div class="analysis-title">Анализ дистрибьютора</div>
+          </div>
+          <button id="btn-back-main" class="btn btn-ghost">
+            <i class="fa-solid fa-arrow-left"></i>
+            На главную
+          </button>
+        </div>
+        <p class="analysis-subtitle">
+          Выберите дистрибьютора из списка или начните вводить название — система выполнит ML‑анализ и покажет
+          честный рейтинг, плюсы, минусы и рекомендации.
+        </p>
+
+        <div class="input-group">
+          <div class="input-wrapper">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input id="distributor-input" class="text-input" list="distributor-list"
+                   placeholder="Например, Zvonko Digital" autocomplete="off">
+            <datalist id="distributor-list"></datalist>
+          </div>
+          <button id="btn-analyze" class="btn btn-primary">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            Запустить ML‑анализ
+          </button>
+        </div>
+        <p class="helper-text">
+          Если вы введёте неизвестное название, система предложит выбрать дистрибьютора из существующей базы.
+        </p>
+
+        <div id="loading-banner" class="loading-banner">
+          <div class="loading-dot"></div>
+          <span>ML‑модель обрабатывает данные...</span>
+        </div>
+
+        <div id="result-card" class="result-card">
+          <div class="result-header">
+            <div>
+              <div class="card-header-label">Результат анализа</div>
+              <div id="res-name" class="result-name"></div>
+            </div>
+            <div>
+              <div class="result-rating-main">
+                <span id="res-rating">0</span>
+                <span>/ 100</span>
+              </div>
+              <div id="res-label" class="rating-badge rating-badge-mid" style="margin-top:4px;"></div>
+            </div>
+          </div>
+
+          <div class="result-grid">
+            <div>
+              <div class="result-label">Год основания</div>
+              <div id="res-year" class="result-value"></div>
+            </div>
+            <div>
+              <div class="result-label">Количество артистов</div>
+              <div id="res-artists" class="result-value"></div>
+            </div>
+            <div>
+              <div class="result-label">Комиссия</div>
+              <div id="res-commission" class="result-value"></div>
+            </div>
+            <div>
+              <div class="result-label">Средний срок выплат</div>
+              <div id="res-payout" class="result-value"></div>
+            </div>
+            <div>
+              <div class="result-label">TikTok</div>
+              <div id="res-tiktok" class="result-value"></div>
+            </div>
+            <div>
+              <div class="result-label">VK</div>
+              <div id="res-vk" class="result-value"></div>
+            </div>
+          </div>
+
+          <table class="category-table">
+            <thead>
+              <tr>
+                <th>Категория</th>
+                <th>Оценка (0–10)</th>
+              </tr>
+            </thead>
+            <tbody id="res-categories"></tbody>
+          </table>
+
+          <div class="result-columns">
+            <div class="result-column-block">
+              <div class="result-column-title">Плюсы</div>
+              <ul id="res-pluses"></ul>
+            </div>
+            <div class="result-column-block">
+              <div class="result-column-title">Минусы</div>
+              <ul id="res-minuses"></ul>
+            </div>
+            <div class="result-column-block">
+              <div class="result-column-title">Рекомендации</div>
+              <ul id="res-recommendations"></ul>
+            </div>
+          </div>
+
+          <div class="result-explanation" style="margin-top:10px;">
+            <span id="res-fit"></span>
+          </div>
+
+          <div class="back-row">
+            <button id="btn-back-main-bottom" class="btn btn-ghost">
+              <i class="fa-solid fa-arrow-left"></i>
+              На главный экран
+            </button>
+            <button id="btn-open-rating-from-result" class="btn btn-outline">
+              <i class="fa-solid fa-ranking-star"></i>
+              Открыть общий рейтинг
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div>© {{ year }} MusicMatch. Демонстрационный проект анализа дистрибьюторов.</div>
+    <div class="footer-right">
+      <span><i class="fa-solid fa-shield-heart"></i> Данные условные, для учебных целей.</span>
+    </div>
+  </footer>
+</div>
+
+<!-- МОДАЛЬНОЕ ОКНО РЕЙТИНГА -->
+<div id="rating-modal-backdrop" class="modal-backdrop">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">
+          <i class="fa-solid fa-ranking-star" style="color:var(--accent-2); margin-right:6px;"></i>
+          Рейтинг дистрибьюторов
+        </div>
+        <div class="modal-subtitle">
+          Список отсортирован по ML‑рейтингам от лучшего к худшему.
+        </div>
+      </div>
+      <button id="btn-modal-close" class="modal-close" aria-label="Закрыть">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <table class="rating-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>Рейтинг (0–100)</th>
+            <th>ML‑оценка</th>
+          </tr>
+        </thead>
+        <tbody id="rating-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const distributors = {{ distributors | tojson }};
+
+  const screenMain = document.getElementById('screen-main');
+  const screenAnalysis = document.getElementById('screen-analysis');
+
+  const btnGo = document.getElementById('btn-go');
+  const btnGoSecondary = document.getElementById('btn-go-secondary');
+  const btnBackMain = document.getElementById('btn-back-main');
+  const btnBackMainBottom = document.getElementById('btn-back-main-bottom');
+
+  const btnRating = document.getElementById('btn-rating');
+  const btnOpenRatingFromResult = document.getElementById('btn-open-rating-from-result');
+
+  const ratingModalBackdrop = document.getElementById('rating-modal-backdrop');
+  const btnModalClose = document.getElementById('btn-modal-close');
+  const ratingTableBody = document.getElementById('rating-table-body');
+
+  const distributorInput = document.getElementById('distributor-input');
+  const distributorList = document.getElementById('distributor-list');
+  const btnAnalyze = document.getElementById('btn-analyze');
+  const loadingBanner = document.getElementById('loading-banner');
+  const resultCard = document.getElementById('result-card');
+
+  const resName = document.getElementById('res-name');
+  const resRating = document.getElementById('res-rating');
+  const resLabel = document.getElementById('res-label');
+  const resYear = document.getElementById('res-year');
+  const resArtists = document.getElementById('res-artists');
+  const resCommission = document.getElementById('res-commission');
+  const resPayout = document.getElementById('res-payout');
+  const resTiktok = document.getElementById('res-tiktok');
+  const resVk = document.getElementById('res-vk');
+  const resCategories = document.getElementById('res-categories');
+  const resPluses = document.getElementById('res-pluses');
+  const resMinuses = document.getElementById('res-minuses');
+  const resRecommendations = document.getElementById('res-recommendations');
+  const resFit = document.getElementById('res-fit');
+
+  const topList = document.getElementById('top-list');
+
+  function showScreenMain() {
+    screenMain.classList.add('active');
+    screenAnalysis.classList.remove('active');
+  }
+
+  function showScreenAnalysis() {
+    screenMain.classList.remove('active');
+    screenAnalysis.classList.add('active');
+  }
+
+  btnGo.addEventListener('click', showScreenAnalysis);
+  btnGoSecondary.addEventListener('click', showScreenAnalysis);
+  btnBackMain.addEventListener('click', showScreenMain);
+  btnBackMainBottom.addEventListener('click', showScreenMain);
+
+  function openRatingModal() {
+    ratingModalBackdrop.classList.add('active');
+  }
+
+  function closeRatingModal() {
+    ratingModalBackdrop.classList.remove('active');
+  }
+
+  btnRating.addEventListener('click', openRatingModal);
+  btnOpenRatingFromResult.addEventListener('click', openRatingModal);
+  btnModalClose.addEventListener('click', closeRatingModal);
+
+  ratingModalBackdrop.addEventListener('click', (e) => {
+    if (e.target === ratingModalBackdrop) {
+      closeRatingModal();
+    }
+  });
+
+  function labelClass(label) {
+    if (label === 'Высокая') return 'badge-high';
+    if (label === 'Средняя') return 'badge-mid';
+    return 'badge-low';
+  }
+
+  function labelClassSmall(label) {
+    if (label === 'Высокая') return 'rating-badge rating-badge-high';
+    if (label === 'Средняя') return 'rating-badge rating-badge-mid';
+    return 'rating-badge rating-badge-low';
+  }
+
+  function populateDatalist() {
+    distributorList.innerHTML = '';
+    distributors.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.name;
+      distributorList.appendChild(opt);
+    });
+  }
+
+  function populateTopList() {
+    const sorted = [...distributors].sort((a, b) => b.rating - a.rating).slice(0, 5);
+    topList.innerHTML = '';
+    sorted.forEach((d, idx) => {
+      const row = document.createElement('div');
+      row.className = 'rating-list-row';
+      const left = document.createElement('div');
+      left.textContent = `${idx + 1}. ${d.name}`;
+      const right = document.createElement('div');
+      right.innerHTML = `<span class="rating-score">${d.rating}</span>`;
+      row.appendChild(left);
+      row.appendChild(right);
+      topList.appendChild(row);
+    });
+  }
+
+  function populateRatingTable() {
+    const sorted = [...distributors].sort((a, b) => b.rating - a.rating);
+    ratingTableBody.innerHTML = '';
+    sorted.forEach(d => {
+      const tr = document.createElement('tr');
+
+      const tdName = document.createElement('td');
+      tdName.textContent = d.name;
+
+      const tdRating = document.createElement('td');
+      tdRating.innerHTML = `<span class="rating-score">${d.rating}</span>`;
+
+      const tdLabel = document.createElement('td');
+      const span = document.createElement('span');
+      span.className = `badge-label ${labelClass(d.ml_label)}`;
+      span.innerHTML = `<i class="fa-solid fa-circle"></i> ${d.ml_label}`;
+      tdLabel.appendChild(span);
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdRating);
+      tr.appendChild(tdLabel);
+
+      ratingTableBody.appendChild(tr);
+    });
+  }
+
+  function setResultCard(d) {
+    resName.textContent = d.name;
+    resRating.textContent = d.rating;
+    resYear.textContent = d.year;
+    resArtists.textContent = d.artists;
+    resCommission.textContent = d.commission + ' %';
+    resPayout.textContent = d.payout_days + ' дней';
+    resTiktok.textContent = d.tiktok ? 'Да' : 'Нет';
+    resVk.textContent = d.vk ? 'Да' : 'Нет';
+
+    resLabel.textContent = d.ml_label;
+    resLabel.className = labelClassSmall(d.ml_label);
+
+    // категории
+    resCategories.innerHTML = '';
+    const categories = d.scores;
+    const names = {
+      payouts: 'Надёжность выплат',
+      speed: 'Скорость выплат',
+      support: 'Поддержка',
+      transparency: 'Прозрачность отчётов',
+      promo: 'Промо‑поддержка',
+      ux: 'Удобство кабинета',
+      reputation: 'Репутация',
+      stability: 'Стабильность релизов',
+    };
+    Object.keys(names).forEach(key => {
+      const tr = document.createElement('tr');
+      const tdName = document.createElement('td');
+      const tdScore = document.createElement('td');
+      tdName.textContent = names[key];
+      tdScore.textContent = categories[key];
+      tr.appendChild(tdName);
+      tr.appendChild(tdScore);
+      resCategories.appendChild(tr);
+    });
+
+    // плюсы
+    resPluses.innerHTML = '';
+    (d.pluses || []).forEach(text => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      resPluses.appendChild(li);
+    });
+
+    // минусы
+    resMinuses.innerHTML = '';
+    (d.minuses || []).forEach(text => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      resMinuses.appendChild(li);
+    });
+
+    // рекомендации
+    resRecommendations.innerHTML = '';
+    (d.recommendations || []).forEach(text => {
+      const li = document.createElement('li');
+      li.textContent = text;
+      resRecommendations.appendChild(li);
+    });
+
+    // кому подходит
+    resFit.textContent = (d.fit || []).join(' ');
+
+    resultCard.style.display = 'block';
+  }
+
+  function showLoading(show) {
+    loadingBanner.style.display = show ? 'flex' : 'none';
+  }
+
+  async function analyzeDistributor() {
+    const name = distributorInput.value.trim();
+    if (!name) {
+      alert('Введите название дистрибьютора или выберите из списка.');
+      return;
+    }
+
+    showLoading(true);
+    resultCard.style.display = 'none';
+
+    const delay = 500 + Math.random() * 500;
+    const delayPromise = new Promise(resolve => setTimeout(resolve, delay));
+
+    const fetchPromise = fetch('/api/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name })
+    }).then(r => r.json());
+
+    const [data] = await Promise.all([fetchPromise, delayPromise]);
+
+    showLoading(false);
+
+    if (!data.ok) {
+      alert('Дистрибьютор не найден. Пожалуйста, выберите из существующего списка.');
+      return;
+    }
+
+    setResultCard(data.distributor);
+  }
+
+  btnAnalyze.addEventListener('click', analyzeDistributor);
+  distributorInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      analyzeDistributor();
+    }
+  });
+
+  populateDatalist();
+  populateTopList();
+  populateRatingTable();
+</script>
+</body>
+</html>
+"""
+
+# ================== FLASK РОУТЫ
+
+@app.route("/")
+def index():
+    return render_template_string(
+        INDEX_HTML,
+        distributors=distributors,
+        year=datetime.now().year
+    )
+
+
+@app.route("/api/analyze", methods=["POST"])
+def api_analyze():
+    data = request.get_json(force=True)
+    name = (data.get("name") or "").strip().lower()
+    dist = None
+    for d in distributors:
+        if d["name"].lower() == name:
+            dist = d
+            break
+
+    if dist is None:
+        return jsonify({"ok": False})
+
+    result = {
+        "name": dist["name"],
+        "year": dist["year"],
+        "artists": dist["artists"],
+        "commission": dist["commission"],
+        "payout_days": dist["payout_days"],
+        "tiktok": dist["tiktok"],
+        "vk": dist["vk"],
+        "rating": dist["rating"],
+        "ml_label": dist["ml_label"],
+        "scores": dist["scores"],
+        "pluses": dist["pluses"],
+        "minuses": dist["minuses"],
+        "recommendations": dist["recommendations"],
+        "fit": dist["fit"],
+    }
+    return jsonify({"ok": True, "distributor": result})
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
